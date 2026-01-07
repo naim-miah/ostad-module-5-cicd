@@ -1,0 +1,75 @@
+name: CI/CD Node App (Test → Artifact → Deploy)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test Job
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # If your repo has tests, this will run them
+      # If tests do not exist or fail, see "Common challenges" section below
+      - name: Run tests and save results
+        run: |
+          mkdir -p test-results
+          npm test -- --ci 2>&1 | tee test-results/test-results.txt
+
+      - name: Upload test results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/test-results.txt
+
+  deploy:
+    name: Deploy Job (Self-hosted)
+    needs: test
+    runs-on: [self-hosted, Linux, X64]  # use your runner labels
+
+    steps:
+      - name: Download test results artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: downloaded-artifacts
+
+      - name: Display artifact content
+        run: |
+          echo "===== Test Results Artifact ====="
+          cat downloaded-artifacts/test-results.txt
+          echo "================================="
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy app (install + restart)
+        run: |
+          echo "Deploying on self-hosted runner..."
+          npm ci
+
+          # Install pm2 if not installed
+          if ! command -v pm2 >/dev/null 2>&1; then
+            npm install -g pm2
+          fi
+
+          # Start or restart the app
+          # Change "app.js" to your real start file if needed
+          pm2 start npm --name node-app -- start || pm2 restart node-app
+          pm2 save
+
+          echo "Deployment complete!"

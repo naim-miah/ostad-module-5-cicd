@@ -16,4 +16,11 @@
     "mocha": "^10.3.0",
     "supertest": "^6.3.4"
   }
+
+  "scripts": {
+  "start": "node src/server.js",
+  "dev": "node src/server.js",
+  "check": "mocha test/**/*.test.js",
+  "test": "mocha test/**/*.test.js"
+  }
 }
